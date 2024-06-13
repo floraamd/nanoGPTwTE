@@ -1,3 +1,14 @@
+# Adding TE
+This is an edited version of nanoGPT to include the option to use TransformerEngine layers as well
+
+Changes are mostly in model.py and train.py
+
+Make sure to have TE installed first
+
+To run nanoGPT with the TE layers, use the following line instead
+```
+python train.py --use_te=True --compile=False config/train_shakespeare_char.py
+```
 
 # nanoGPT
 
