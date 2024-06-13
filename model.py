@@ -142,8 +142,8 @@ class GPT(nn.Module):
                 wte = nn.Embedding(config.vocab_size, config.n_embd),
                 wpe = nn.Embedding(config.block_size, config.n_embd),
                 drop = nn.Dropout(config.dropout),
-                h = nn.ModuleList([te.TransformerLayer(config.n_embd, config.n_embd, config.n_head, bias=config.bias,layer_number=i+1) for i in range(config.n_layer)]),  
-                #my guess: hidden_size=config.block_size, ffn_hidden_size=config.n_embd, num_attention_heads=config.n_head
+                h = nn.ModuleList([te.TransformerLayer(config.n_embd, config.n_embd*4, config.n_head, bias=config.bias,layer_number=i+1) for i in range(config.n_layer)]),  
+                #my guess: hidden_size=config.block_size, ffn_hidden_size=config.n_embd*4, num_attention_heads=config.n_head
                 ln_f = LayerNorm(config.n_embd, bias=config.bias),
             ))
             self.lm_head = te.Linear(config.n_embd, config.vocab_size, bias=False)
