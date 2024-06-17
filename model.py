@@ -16,6 +16,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from transformer_engine import pytorch as te
+from transformer_engine.common import recipe
 
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
@@ -236,7 +237,7 @@ class GPT(nn.Module):
                 block.attn.bias = block.attn.bias[:,:,:block_size,:block_size]
 
     @classmethod
-    def from_pretrained(cls, model_type, override_args=None,use_fp8=False):
+    def from_pretrained(cls, model_type, override_args=None,use_fp8=False,recipe=None):
         assert model_type in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}
         override_args = override_args or {} # default to empty dict
         # only dropout can be overridden see more notes below
@@ -261,7 +262,7 @@ class GPT(nn.Module):
             config_args['dropout'] = override_args['dropout']
         # create a from-scratch initialized minGPT model
         config = GPTConfig(**config_args)
-        with te.fp8_autocast(enabled=use_fp8):
+        with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe):
             model = GPT(config)
         sd = model.state_dict()
         sd_keys = sd.keys()
