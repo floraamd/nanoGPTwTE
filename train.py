@@ -352,4 +352,8 @@ if ddp:
 
 # print(prof.key_averages(group_by_stack_n=5).table(row_limit=5))
 
+<<<<<<< HEAD
 # export_chrome_trace("/tmp/test_trace_" + "trace" + ".json")
+=======
+# prof.export_chrome_trace("/tmp/test_trace_" + "trace" + ".json")
+>>>>>>> deb43d6deafbdc51f0a2d84290fed14ec4f0f753
