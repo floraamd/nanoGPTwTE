@@ -303,7 +303,8 @@ while True:
     # forward backward update, with optional gradient accumulation to simulate larger batch size
     # and using the GradScaler if data type is float16
     for micro_step in range(gradient_accumulation_steps):
-        with profiler.profile(with_stack=True, profile_memory=True) as prof:
+        # with profiler.profile(with_stack=True, profile_memory=True) as prof:
+        with torch.autograd.profiler.emit_nvtx() as prof:
             if ddp:
                 # in DDP training we only need to sync gradients at the last micro step.
                 # the official way to do this is with model.no_sync() context manager, but
@@ -349,6 +350,6 @@ while True:
 if ddp:
     destroy_process_group()
 
-print(prof.key_averages(group_by_stack_n=5).table(row_limit=5))
+# print(prof.key_averages(group_by_stack_n=5).table(row_limit=5))
 
-prof.export_chrome_trace("/tmp/test_trace_" + "trace" + ".json")
+# prof.export_chrome_trace("/tmp/test_trace_" + "trace" + ".json")
