@@ -89,7 +89,7 @@ if(use_fp8):
     recipe = recipe.DelayedScaling()
 if(use_te):
     print("Using TE layers")
-    tensor_parallel_group = torch.distributed.new_group(ranks=[0], backend=backend) #single GPU for now
+    
 # various inits, derived attributes, I/O setup
 ddp = int(os.environ.get('RANK', -1)) != -1 # is this a ddp run?
 if ddp:
@@ -106,7 +106,7 @@ if ddp:
     assert gradient_accumulation_steps % ddp_world_size == 0
     gradient_accumulation_steps //= ddp_world_size
     if(use_te):
-        tensor_parallel_group = torch.distributed.new_group(ranks=ddp_rank, backend=backend)
+        tensor_parallel_group = torch.distributed.new_group(ranks=[ddp_rank], backend=backend)
 else:
     # if not ddp, we are running on a single gpu, and one process
     master_process = True
@@ -159,7 +159,7 @@ if os.path.exists(meta_path):
 
 # model init
 model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=block_size,
-                  bias=bias, vocab_size=None, dropout=dropout, use_te=use_te, ddp=ddp, tensor_parallel_group=tensor_parallel_group) # start with model_args from command line
+                  bias=bias, vocab_size=None, dropout=dropout, use_te=use_te, ddp=ddp) # start with model_args from command line
 if init_from == 'scratch':
     # init a new model from scratch
     print("Initializing a new model from scratch")
@@ -169,7 +169,7 @@ if init_from == 'scratch':
     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
     gptconf = GPTConfig(**model_args)
     with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe):
-        model = GPT(gptconf)
+        model = GPT(gptconf, tensor_parallel_group)
 elif init_from == 'resume':
     print(f"Resuming training from {out_dir}")
     # resume training from a checkpoint.
@@ -183,7 +183,7 @@ elif init_from == 'resume':
     # create the model
     gptconf = GPTConfig(**model_args)
     with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe):
-        model = GPT(gptconf)
+        model = GPT(gptconf, tensor_parallel_group)
     state_dict = checkpoint['model']
     # fix the keys of the state dictionary :(
     # honestly no idea how checkpoints sometimes get this prefix, have to debug more
@@ -198,7 +198,7 @@ elif init_from.startswith('gpt2'):
     print(f"Initializing from OpenAI GPT-2 weights: {init_from}")
     # initialize from OpenAI GPT-2 weights
     override_args = dict(dropout=dropout)
-    model = GPT.from_pretrained(init_from, override_args,use_fp8,recipe)
+    model = GPT.from_pretrained(init_from, override_args, use_fp8,recipe, tensor_parallel_group)
     # read off the created config params, so we can store them into checkpoint correctly
     for k in list(model_args.keys()): #['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size', 'use_te','ddp','tensor_parallel_group']:
         model_args[k] = getattr(model.config, k)

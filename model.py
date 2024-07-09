@@ -129,11 +129,10 @@ class GPTConfig:
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     use_te: bool = False
     ddp: bool = False
-    tensor_parallel_group=None
 
 class GPT(nn.Module):
 
-    def __init__(self, config):
+    def __init__(self, config, tensor_parallel_group=None):
         super().__init__()
         assert config.vocab_size is not None
         assert config.block_size is not None
@@ -141,26 +140,19 @@ class GPT(nn.Module):
 
         # TE comes with a transformer too: https://github.com/ROCm/TransformerEngine/blob/dev/transformer_engine/pytorch/transformer.py
         if(config.use_te):
-            # world_group = torch.distributed.init_process_group(
-            #     "nccl",
-            #     init_method="file:///tmp/rdzv",
-            #     world_size=1,
-            #     rank=0,
-            # )
-            # tensor_parallel_group = torch.distributed.new_group(ranks=[0], backend="nccl")
             self.transformer = nn.ModuleDict(dict(
                 wte = nn.Embedding(config.vocab_size, config.n_embd),
                 wpe = nn.Embedding(config.block_size, config.n_embd),
                 drop = nn.Dropout(config.dropout),
                 h = nn.ModuleList([te.TransformerLayer( config.n_embd, config.n_embd*4, config.n_head, 
                                                         bias=config.bias,
-                                                        set_parallel_mode=config.ddp, 
-                                                        tp_group=config.tensor_parallel_group, 
-                                                        sequence_parallel=config.ddp,
                                                         layer_number=i+1, 
                                                         attn_input_format = 'bshd',
                                                         hidden_dropout=config.dropout,
-                                                        attention_dropout=config.dropout) 
+                                                        attention_dropout=config.dropout,
+                                                        set_parallel_mode=config.ddp, 
+                                                        tp_group=tensor_parallel_group, 
+                                                        sequence_parallel=config.ddp) 
                                                         for i in range(config.n_layer)]),  
                 #my guess: hidden_size=config.block_size, ffn_hidden_size=config.n_embd*4, num_attention_heads=config.n_head
                 ln_f = LayerNorm(config.n_embd, bias=config.bias),
@@ -249,7 +241,7 @@ class GPT(nn.Module):
                 block.attn.bias = block.attn.bias[:,:,:block_size,:block_size]
 
     @classmethod
-    def from_pretrained(cls, model_type, override_args=None,use_fp8=False,recipe=None):
+    def from_pretrained(cls, model_type, override_args=None,use_fp8=False,recipe=None,tensor_parallel_group=None):
         assert model_type in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}
         override_args = override_args or {} # default to empty dict
         # only dropout can be overridden see more notes below
@@ -275,7 +267,7 @@ class GPT(nn.Module):
         # create a from-scratch initialized minGPT model
         config = GPTConfig(**config_args)
         with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe):
-            model = GPT(config)
+            model = GPT(config, tensor_parallel_group)
         sd = model.state_dict()
         sd_keys = sd.keys()
         sd_keys = [k for k in sd_keys if not k.endswith('.attn.bias')] # discard this mask / buffer, not a param
