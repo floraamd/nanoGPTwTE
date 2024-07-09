@@ -128,6 +128,8 @@ class GPTConfig:
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     use_te: bool = False
+    ddp: bool = False
+    tensor_parallel_group=None
 
 class GPT(nn.Module):
 
@@ -139,12 +141,22 @@ class GPT(nn.Module):
 
         # TE comes with a transformer too: https://github.com/ROCm/TransformerEngine/blob/dev/transformer_engine/pytorch/transformer.py
         if(config.use_te):
+            # world_group = torch.distributed.init_process_group(
+            #     "nccl",
+            #     init_method="file:///tmp/rdzv",
+            #     world_size=1,
+            #     rank=0,
+            # )
+            # tensor_parallel_group = torch.distributed.new_group(ranks=[0], backend="nccl")
             self.transformer = nn.ModuleDict(dict(
                 wte = nn.Embedding(config.vocab_size, config.n_embd),
                 wpe = nn.Embedding(config.block_size, config.n_embd),
                 drop = nn.Dropout(config.dropout),
                 h = nn.ModuleList([te.TransformerLayer( config.n_embd, config.n_embd*4, config.n_head, 
-                                                        bias=config.bias, 
+                                                        bias=config.bias,
+                                                        set_parallel_mode=config.ddp, 
+                                                        tp_group=config.tensor_parallel_group, 
+                                                        sequence_parallel=config.ddp,
                                                         layer_number=i+1, 
                                                         attn_input_format = 'bshd',
                                                         hidden_dropout=config.dropout,
