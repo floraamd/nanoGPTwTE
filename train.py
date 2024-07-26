@@ -168,7 +168,7 @@ if init_from == 'scratch':
         print("defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)")
     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
     gptconf = GPTConfig(**model_args)
-    with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe):
+    with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe,fp8_group=tensor_parallel_group):
         model = GPT(gptconf, tensor_parallel_group)
 elif init_from == 'resume':
     print(f"Resuming training from {out_dir}")
@@ -182,7 +182,7 @@ elif init_from == 'resume':
         model_args[k] = checkpoint_model_args[k]
     # create the model
     gptconf = GPTConfig(**model_args)
-    with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe):
+    with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe,fp8_group=tensor_parallel_group):
         model = GPT(gptconf, tensor_parallel_group)
     state_dict = checkpoint['model']
     # fix the keys of the state dictionary :(

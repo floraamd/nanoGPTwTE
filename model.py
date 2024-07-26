@@ -266,7 +266,7 @@ class GPT(nn.Module):
             config_args['dropout'] = override_args['dropout']
         # create a from-scratch initialized minGPT model
         config = GPTConfig(**config_args)
-        with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe):
+        with te.fp8_autocast(enabled=use_fp8,fp8_recipe=recipe,fp8_group=tensor_parallel_group):
             model = GPT(config, tensor_parallel_group)
         sd = model.state_dict()
         sd_keys = sd.keys()
